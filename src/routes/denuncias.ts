@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
 import type { Prisma } from '../generated/prisma/client.js';
-import { TipoProblema } from '../generated/prisma/enums.js';
+import { StatusDenuncia, TipoProblema } from '../generated/prisma/enums.js';
 import { sessaoExpirada } from '../lib/auth.js';
 import { type Coordenadas, distanciaKm } from '../lib/distancia.js';
 import { AppError, camposDoZod } from '../lib/errors.js';
@@ -27,6 +27,26 @@ const novaDenunciaSchema = z.object({
 
 function dadosInvalidos(campos: Record<string, string>) {
   return new AppError(422, 'DADOS_INVALIDOS', 'Alguns dados estão inválidos.', campos);
+}
+
+// Única sequência permitida: recebida → em_analise → resolvida (sem pular nem voltar)
+const PROXIMO_STATUS: Record<StatusDenuncia, StatusDenuncia | null> = {
+  recebida: 'em_analise',
+  em_analise: 'resolvida',
+  resolvida: null,
+};
+
+const mudarStatusSchema = z.object({ status: z.enum(StatusDenuncia) });
+
+function transicaoInvalida(atual: StatusDenuncia) {
+  const proximo = PROXIMO_STATUS[atual];
+  return dadosInvalidos({
+    status: proximo ? `de ${atual} só pode ir para ${proximo}` : 'a denúncia já está resolvida',
+  });
+}
+
+function naoEncontrada() {
+  return new AppError(404, 'NAO_ENCONTRADA', 'Denúncia não encontrada.');
 }
 
 // lat e lng são opcionais, mas só fazem sentido juntos
@@ -229,8 +249,55 @@ export async function denunciasRoutes(app: FastifyInstance) {
       where: { id, municipioId: request.user.municipioId },
       select: campos,
     });
-    if (!denuncia) throw new AppError(404, 'NAO_ENCONTRADA', 'Denúncia não encontrada.');
+    if (!denuncia) throw naoEncontrada();
 
     return formatar(denuncia, request.user.sub, posicao);
+  });
+
+  app.patch('/denuncias/:id/status', async (request) => {
+    const { id } = z.object({ id: z.string() }).parse(request.params);
+
+    // Papel conferido no banco, como no cadastro de usuários
+    const gestor = await prisma.usuario.findUnique({
+      where: { id: request.user.sub },
+      select: { id: true, papel: true, municipioId: true },
+    });
+    if (!gestor) throw sessaoExpirada();
+    if (gestor.papel !== 'gestor') {
+      throw new AppError(403, 'SEM_PERMISSAO', 'Só gestores da prefeitura podem mudar o status.');
+    }
+
+    const { status: para } = mudarStatusSchema.parse(request.body);
+
+    const denuncia = await prisma.$transaction(async (tx) => {
+      // De outro município responde igual a inexistente, como no GET /denuncias/:id
+      const atual = await tx.denuncia.findFirst({
+        where: { id, municipioId: gestor.municipioId },
+        select: { status: true },
+      });
+      if (!atual) throw naoEncontrada();
+      if (PROXIMO_STATUS[atual.status] !== para) throw transicaoInvalida(atual.status);
+
+      // Só muda se o status ainda for o que lemos: se outro gestor mudou no meio
+      // do caminho, esta tentativa falha em vez de registrar a mesma mudança duas vezes
+      const { count } = await tx.denuncia.updateMany({
+        where: { id, status: atual.status },
+        data: { status: para },
+      });
+      if (count === 0) {
+        const agora = await tx.denuncia.findUniqueOrThrow({
+          where: { id },
+          select: { status: true },
+        });
+        throw transicaoInvalida(agora.status);
+      }
+
+      await tx.historicoStatus.create({
+        data: { denunciaId: id, de: atual.status, para, gestorId: gestor.id },
+      });
+      return tx.denuncia.findUniqueOrThrow({ where: { id }, select: campos });
+    });
+
+    return formatar(denuncia, gestor.id, undefined);
   });
 }
