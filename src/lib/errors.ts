@@ -15,14 +15,25 @@ export type CodigoErro =
 
 // Lance nas rotas para responder um erro esperado:
 // throw new AppError(404, 'NAO_ENCONTRADA', 'Denúncia não encontrada.')
+// `campos` só em 422, como no contrato: { foto: 'obrigatório' }
 export class AppError extends Error {
   constructor(
     readonly statusCode: number,
     readonly codigo: CodigoErro,
     mensagem: string,
+    readonly campos?: Record<string, string>,
   ) {
     super(mensagem);
   }
+}
+
+// { campo: primeira mensagem }, pelo nome do campo principal: erro em tipos[1] vira "tipos"
+export function camposDoZod(error: ZodError) {
+  const campos: Record<string, string> = {};
+  for (const issue of error.issues) {
+    campos[String(issue.path[0] ?? '_')] ??= issue.message;
+  }
+  return campos;
 }
 
 type CorpoErro = {
@@ -33,30 +44,27 @@ type CorpoErro = {
 export function registrarTratamentoDeErros(app: FastifyInstance) {
   app.setErrorHandler<FastifyError | Error>((error, request, reply) => {
     if (error instanceof AppError) {
+      const { codigo, message: mensagem, campos } = error;
       return reply
         .status(error.statusCode)
-        .send({ erro: { codigo: error.codigo, mensagem: error.message } } satisfies CorpoErro);
+        .send({ erro: { codigo, mensagem, ...(campos && { campos }) } } satisfies CorpoErro);
     }
 
     if (error instanceof ZodError) {
-      const campos: Record<string, string> = {};
-      for (const issue of error.issues) {
-        const campo = issue.path.join('.') || '_';
-        campos[campo] ??= issue.message;
-      }
       return reply.status(422).send({
         erro: {
           codigo: 'DADOS_INVALIDOS',
           mensagem: 'Alguns dados estão inválidos.',
-          campos,
+          campos: camposDoZod(error),
         },
       } satisfies CorpoErro);
     }
 
-    // Erros do próprio Fastify com status 4xx (JSON malformado, corpo grande demais…)
+    // Erros do próprio Fastify com status 4xx (JSON malformado, corpo grande demais,
+    // formulário que não é multipart…): o contrato responde tudo como 400
     const status = 'statusCode' in error ? error.statusCode : undefined;
     if (status && status >= 400 && status < 500) {
-      return reply.status(status).send({
+      return reply.status(400).send({
         erro: { codigo: 'REQUISICAO_INVALIDA', mensagem: 'Requisição inválida.' },
       } satisfies CorpoErro);
     }
