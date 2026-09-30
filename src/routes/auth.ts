@@ -2,16 +2,13 @@ import argon2 from 'argon2';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
+import { cpfDigitos } from '../lib/cpf.js';
 import { AppError } from '../lib/errors.js';
 import { prisma } from '../lib/prisma.js';
 
 const loginSchema = z.object({
   municipioId: z.string().min(1),
-  // Aceita com ou sem máscara; guardamos e comparamos só os dígitos
-  cpf: z
-    .string()
-    .transform((valor) => valor.replace(/\D/g, ''))
-    .refine((digitos) => digitos.length === 11, 'deve ter 11 dígitos'),
+  cpf: cpfDigitos,
   senha: z.string().min(1),
 });
 
