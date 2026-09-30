@@ -11,6 +11,7 @@ export type CodigoErro =
   | 'CPF_JA_CADASTRADO'
   | 'SENHA_INCORRETA'
   | 'DADOS_INVALIDOS'
+  | 'MUITAS_TENTATIVAS'
   | 'ERRO_INTERNO';
 
 // Lance nas rotas para responder um erro esperado:

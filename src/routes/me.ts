@@ -2,7 +2,7 @@ import argon2 from 'argon2';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
-import { sessaoExpirada } from '../lib/auth.js';
+import { emitirToken, sessaoExpirada } from '../lib/auth.js';
 import { AppError } from '../lib/errors.js';
 import { prisma } from '../lib/prisma.js';
 
@@ -34,7 +34,7 @@ export async function meRoutes(app: FastifyInstance) {
     return { ...dados, estatisticas: { denuncias: _count.denuncias } };
   });
 
-  app.patch('/me/senha', async (request, reply) => {
+  app.patch('/me/senha', async (request) => {
     const { senhaAtual, novaSenha } = trocarSenhaSchema.parse(request.body);
 
     const usuario = await prisma.usuario.findUnique({
@@ -48,11 +48,14 @@ export async function meRoutes(app: FastifyInstance) {
       throw new AppError(403, 'SENHA_INCORRETA', 'A senha atual está incorreta.');
     }
 
-    await prisma.usuario.update({
+    // Subir a versão da sessão derruba todos os tokens emitidos antes, em qualquer
+    // aparelho (ex.: um token roubado). Este aparelho recebe um token novo e segue logado.
+    const atualizado = await prisma.usuario.update({
       where: { id: request.user.sub },
-      data: { senhaHash: await argon2.hash(novaSenha) },
+      data: { senhaHash: await argon2.hash(novaSenha), versaoSessao: { increment: 1 } },
+      select: { id: true, municipioId: true, papel: true, versaoSessao: true },
     });
 
-    return reply.status(204).send();
+    return { token: await emitirToken(app, atualizado) };
   });
 }
