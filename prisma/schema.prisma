@@ -1,0 +1,102 @@
+// Modelo de dados do Smart Poste. Referência: docs/API.md no repositório do app.
+// Tabelas e colunas em snake_case no banco; camelCase no código (via @map/@@map).
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Papel {
+  cidadao
+  gestor
+}
+
+enum TipoProblema {
+  fio_exposto
+  sem_energia
+  sem_internet
+  sem_telefone
+  risco_populacao
+}
+
+enum StatusDenuncia {
+  recebida
+  em_analise
+  resolvida
+}
+
+model Municipio {
+  id               String @id // slug, ex.: "piracaia"
+  nome             String
+  uf               String @db.Char(2)
+  estado           String
+  prefixoProtocolo String @map("prefixo_protocolo") // ex.: "SP" → protocolo SP-0248
+  // Último número de protocolo usado; incrementado na mesma transação que cria a denúncia
+  ultimoProtocolo  Int    @default(0) @map("ultimo_protocolo")
+
+  usuarios  Usuario[]
+  denuncias Denuncia[]
+
+  @@map("municipios")
+}
+
+model Usuario {
+  id          String   @id @default(uuid(7))
+  municipioId String   @map("municipio_id")
+  cpf         String   @db.VarChar(11) // só dígitos
+  nome        String
+  senhaHash   String   @map("senha_hash")
+  papel       Papel    @default(cidadao)
+  criadoEm    DateTime @default(now()) @map("criado_em")
+
+  municipio        Municipio         @relation(fields: [municipioId], references: [id])
+  denuncias        Denuncia[]
+  mudancasDeStatus HistoricoStatus[]
+
+  @@unique([municipioId, cpf])
+  @@map("usuarios")
+}
+
+model Denuncia {
+  id           String         @id @default(uuid(7))
+  municipioId  String         @map("municipio_id")
+  autorId      String         @map("autor_id")
+  protocolo    String         @unique
+  tipos        TipoProblema[]
+  status       StatusDenuncia @default(recebida)
+  descricao    String         @default("")
+  fotoUrl      String         @map("foto_url")
+  latitude     Float
+  longitude    Float
+  endereco     String
+  criadaEm     DateTime       @default(now()) @map("criada_em")
+  atualizadaEm DateTime       @updatedAt @map("atualizada_em")
+
+  municipio Municipio         @relation(fields: [municipioId], references: [id])
+  autor     Usuario           @relation(fields: [autorId], references: [id])
+  historico HistoricoStatus[]
+
+  // Feed: denúncias do município, mais recentes primeiro
+  @@index([municipioId, criadaEm(sort: Desc)])
+  @@index([autorId])
+  @@map("denuncias")
+}
+
+model HistoricoStatus {
+  id         String         @id @default(uuid(7))
+  denunciaId String         @map("denuncia_id")
+  de         StatusDenuncia
+  para       StatusDenuncia
+  gestorId   String         @map("gestor_id")
+  em         DateTime       @default(now())
+
+  denuncia Denuncia @relation(fields: [denunciaId], references: [id], onDelete: Cascade)
+  gestor   Usuario  @relation(fields: [gestorId], references: [id])
+
+  @@index([denunciaId])
+  @@map("historico_status")
+}

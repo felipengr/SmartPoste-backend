@@ -1,0 +1,17 @@
+node_modules/
+dist/
+coverage/
+
+# Client gerado pelo Prisma (recriado no `npm install` via postinstall)
+src/generated/
+
+# Variáveis de ambiente locais (use .env.example como modelo)
+.env
+.env.*
+!.env.example
+
+# Fotos enviadas em desenvolvimento
+uploads/
+
+*.log
+.DS_Store

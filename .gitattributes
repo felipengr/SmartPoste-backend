@@ -1,0 +1,7 @@
+# Força LF em todos os arquivos de texto: o Biome formata com LF e os hooks do husky
+# quebram com CRLF. Sem isso, quem clonar no Windows (core.autocrlf) teria tudo convertido.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.ttf binary
