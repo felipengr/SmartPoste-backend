@@ -5,6 +5,7 @@ import { env } from './env.js';
 import { registrarAutenticacao } from './lib/auth.js';
 import { registrarTratamentoDeErros } from './lib/errors.js';
 import { authRoutes } from './routes/auth.js';
+import { denunciasRoutes } from './routes/denuncias.js';
 import { meRoutes } from './routes/me.js';
 import { municipiosRoutes } from './routes/municipios.js';
 import { usuariosRoutes } from './routes/usuarios.js';
@@ -27,6 +28,7 @@ export async function buildApp() {
   await app.register(authRoutes, { prefix: '/v1' });
   await app.register(meRoutes, { prefix: '/v1' });
   await app.register(usuariosRoutes, { prefix: '/v1' });
+  await app.register(denunciasRoutes, { prefix: '/v1' });
 
   return app;
 }
