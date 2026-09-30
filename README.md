@@ -17,8 +17,8 @@ Pré-requisitos: **Node 24** (há um `.nvmrc`) e **Docker Desktop** aberto.
 ```bash
 npm install                 # também gera o client do Prisma
 cp .env.example .env        # variáveis locais
-npm run db:up               # sobe o Postgres no Docker
-npm run db:migrate          # cria as tabelas
+npm run db:up               # sobe o Postgres no Docker (porta 5433)
+npm run db:migrate          # aplica as migrations (cria as tabelas)
 npm run db:seed             # município Piracaia + usuários de teste
 npm run dev                 # API em http://localhost:3333
 ```
@@ -45,7 +45,8 @@ A API escuta em `0.0.0.0`, então o celular na mesma rede Wi-Fi acessa pelo IP d
 | `npm run check` | Lint + formatação (Biome) |
 | `npm run typecheck` | Checagem de tipos |
 | `npm run build` / `npm start` | Build de produção em `dist/` e execução |
-| `npm run db:migrate` | Cria uma migration após mudar `prisma/schema.prisma` |
+| `npm run db:migrate` | Aplica as migrations pendentes no banco local |
+| `npx prisma migrate dev --name <descricao>` | Cria uma migration após mudar `prisma/schema.prisma` (no PowerShell, `npm run db:migrate -- --name` perde o `--name`) |
 | `npm run db:reset` | Apaga o banco local, recria e roda o seed |
 | `npm run db:studio` | Interface visual do banco |
 | `npm run release` | Sobe a versão e atualiza o `CHANGELOG.md` |

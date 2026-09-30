@@ -10,7 +10,7 @@ O contrato da API fica em `docs/API.md` no repositório do app (`../SmartPost-fr
 - Imports relativos usam extensão `.js` (ESM `nodenext`).
 - Valide entradas com zod (`schema.parse(request.body)`); o handler global transforma `ZodError` em 422. Erros esperados: `throw new AppError(status, codigo, mensagem)` de `src/lib/errors.ts`.
 - Nunca devolver `senhaHash` nem CPF nas respostas. Nunca expor quem criou uma denúncia no feed.
-- Mudou `prisma/schema.prisma`? Rode `npm run db:migrate -- --name <descricao>` e versione a pasta `prisma/migrations`.
+- Mudou `prisma/schema.prisma`? Rode `npx prisma migrate dev --name <descricao>` (no PowerShell, `npm run db:migrate -- --name` perde o `--name` e trava esperando input) e versione a pasta `prisma/migrations`.
 
 ## Antes de dar uma tarefa como pronta
 
