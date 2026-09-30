@@ -14,6 +14,10 @@ const schema = z.object({
       (valor) => !valor.startsWith('troque-por'),
       'troque o valor de exemplo do .env.example',
     ),
+  // Fotos das denúncias (Cloudinary → Settings → API Keys)
+  CLOUDINARY_CLOUD_NAME: z.string().min(1),
+  CLOUDINARY_API_KEY: z.string().min(1),
+  CLOUDINARY_API_SECRET: z.string().min(1),
 });
 
 const resultado = schema.safeParse(process.env);
