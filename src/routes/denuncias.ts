@@ -2,9 +2,32 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
 import type { Prisma } from '../generated/prisma/client.js';
+import { TipoProblema } from '../generated/prisma/enums.js';
+import { sessaoExpirada } from '../lib/auth.js';
 import { type Coordenadas, distanciaKm } from '../lib/distancia.js';
-import { AppError } from '../lib/errors.js';
+import { AppError, camposDoZod } from '../lib/errors.js';
+import { ehJpeg } from '../lib/fotos.js';
 import { prisma } from '../lib/prisma.js';
+
+// Campo de texto numérico do formulário: vazio conta como ausente (e não como 0)
+const numero = (minimo: number, maximo: number) =>
+  z.string().trim().min(1, 'obrigatório').pipe(z.coerce.number<string>().min(minimo).max(maximo));
+
+const novaDenunciaSchema = z.object({
+  // Repetido no formulário (tipos=fio_exposto&tipos=sem_energia); repetições são ignoradas
+  tipos: z
+    .array(z.enum(TipoProblema, 'tipo desconhecido'))
+    .min(1, 'selecione ao menos um tipo')
+    .transform((tipos) => [...new Set(tipos)]),
+  descricao: z.string().trim().max(300).default(''),
+  latitude: numero(-90, 90),
+  longitude: numero(-180, 180),
+  endereco: z.string().trim().min(1, 'obrigatório').max(300),
+});
+
+function dadosInvalidos(campos: Record<string, string>) {
+  return new AppError(422, 'DADOS_INVALIDOS', 'Alguns dados estão inválidos.', campos);
+}
 
 // lat e lng são opcionais, mas só fazem sentido juntos
 const posicaoSchema = z
@@ -89,6 +112,76 @@ function lerPosicao(q: { lat?: number | undefined; lng?: number | undefined }) {
 
 export async function denunciasRoutes(app: FastifyInstance) {
   app.addHook('onRequest', app.autenticar);
+
+  // Lê o multipart: a foto vai para a memória (máx. 5 MB) e os textos são agrupados por nome
+  async function lerFormulario(request: FastifyRequest) {
+    const textos: Record<string, string[]> = {};
+    let foto: Buffer | undefined;
+    try {
+      for await (const parte of request.parts()) {
+        if (parte.type === 'file') {
+          const conteudo = await parte.toBuffer();
+          if (parte.fieldname === 'foto') foto = conteudo;
+        } else {
+          textos[parte.fieldname] = [...(textos[parte.fieldname] ?? []), String(parte.value)];
+        }
+      }
+    } catch (erro) {
+      if (erro instanceof app.multipartErrors.RequestFileTooLargeError) {
+        throw dadosInvalidos({ foto: 'máximo de 5 MB' });
+      }
+      // Sem multipart, arquivos demais etc.: vira 400 no tratamento global
+      throw erro;
+    }
+    return { textos, foto };
+  }
+
+  app.post('/denuncias', async (request, reply) => {
+    const autor = await prisma.usuario.findUnique({
+      where: { id: request.user.sub },
+      select: { id: true, municipioId: true },
+    });
+    if (!autor) throw sessaoExpirada();
+
+    const { textos, foto } = await lerFormulario(request);
+
+    // Valida tudo (textos e foto) antes de gastar um upload no Cloudinary
+    const resultado = novaDenunciaSchema.safeParse({
+      tipos: textos.tipos ?? [],
+      descricao: textos.descricao?.[0],
+      latitude: textos.latitude?.[0],
+      longitude: textos.longitude?.[0],
+      endereco: textos.endereco?.[0],
+    });
+    const erros = resultado.success ? {} : camposDoZod(resultado.error);
+    if (!foto) erros.foto = 'obrigatório';
+    else if (!ehJpeg(foto)) erros.foto = 'a foto deve ser JPEG';
+    if (!resultado.success || !foto || erros.foto) throw dadosInvalidos(erros);
+
+    const fotoUrl = await app.enviarFoto(foto, `smartposte/${autor.municipioId}`);
+
+    // Protocolo sequencial por município: o UPDATE trava a linha do município até o fim da
+    // transação, então duas denúncias simultâneas nunca recebem o mesmo número
+    const denuncia = await prisma.$transaction(async (tx) => {
+      const { prefixoProtocolo, ultimoProtocolo } = await tx.municipio.update({
+        where: { id: autor.municipioId },
+        data: { ultimoProtocolo: { increment: 1 } },
+        select: { prefixoProtocolo: true, ultimoProtocolo: true },
+      });
+      return tx.denuncia.create({
+        data: {
+          ...resultado.data,
+          municipioId: autor.municipioId,
+          autorId: autor.id,
+          protocolo: `${prefixoProtocolo}-${String(ultimoProtocolo).padStart(4, '0')}`,
+          fotoUrl,
+        },
+        select: campos,
+      });
+    });
+
+    return reply.status(201).send(formatar(denuncia, autor.id, undefined));
+  });
 
   async function listar(request: FastifyRequest, filtro: Prisma.DenunciaWhereInput) {
     const query = lerQuery(feedSchema, request);
