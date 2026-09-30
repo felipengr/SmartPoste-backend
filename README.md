@@ -16,7 +16,7 @@ Pré-requisitos: **Node 24** (há um `.nvmrc`) e **Docker Desktop** aberto.
 
 ```bash
 npm install                 # também gera o client do Prisma
-cp .env.example .env        # variáveis locais
+cp .env.example .env        # variáveis locais — troque o JWT_SECRET (comando no próprio arquivo)
 npm run db:up               # sobe o Postgres no Docker (porta 5433)
 npm run db:migrate          # aplica as migrations (cria as tabelas)
 npm run db:seed             # município Piracaia + usuários de teste

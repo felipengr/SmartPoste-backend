@@ -6,6 +6,14 @@ const schema = z.object({
   DATABASE_URL: z.url(),
   HOST: z.string().default('0.0.0.0'),
   PORT: z.coerce.number().int().positive().default(3333),
+  // Recusa o valor de exemplo do .env.example: com ele, qualquer um forjaria tokens
+  JWT_SECRET: z
+    .string()
+    .min(32)
+    .refine(
+      (valor) => !valor.startsWith('troque-por'),
+      'troque o valor de exemplo do .env.example',
+    ),
 });
 
 const resultado = schema.safeParse(process.env);

@@ -2,7 +2,9 @@ import cors from '@fastify/cors';
 import Fastify from 'fastify';
 
 import { env } from './env.js';
+import { registrarAutenticacao } from './lib/auth.js';
 import { registrarTratamentoDeErros } from './lib/errors.js';
+import { authRoutes } from './routes/auth.js';
 import { municipiosRoutes } from './routes/municipios.js';
 
 // Monta a aplicação sem subir o servidor, para os testes usarem `app.inject()`
@@ -15,10 +17,12 @@ export async function buildApp() {
   await app.register(cors, { origin: env.NODE_ENV !== 'production' });
 
   registrarTratamentoDeErros(app);
+  await registrarAutenticacao(app);
 
   app.get('/health', async () => ({ status: 'ok' }));
 
   await app.register(municipiosRoutes, { prefix: '/v1' });
+  await app.register(authRoutes, { prefix: '/v1' });
 
   return app;
 }
