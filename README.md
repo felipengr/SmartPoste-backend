@@ -12,7 +12,7 @@ Node.js 24 · TypeScript · Fastify · PostgreSQL · Prisma 7 · zod · argon2 �
 
 ## Como rodar
 
-Pré-requisitos: **Node 24** (há um `.nvmrc`) e **Docker Desktop** aberto.
+Pré-requisitos: **Node 24** (há um `.nvmrc`), **Docker Desktop** aberto e uma conta grátis no **Cloudinary** (fotos das denúncias; crie uma API Key própria em Settings → API Keys e preencha as variáveis `CLOUDINARY_*` do `.env`).
 
 ```bash
 npm install                 # também gera o client do Prisma
