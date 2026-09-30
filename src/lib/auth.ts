@@ -3,9 +3,11 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { env } from '../env.js';
 import type { Papel } from '../generated/prisma/client.js';
 import { AppError } from './errors.js';
+import { prisma } from './prisma.js';
 
-// Dados guardados dentro do token (nada sensível: o token é só assinado, não criptografado)
-export type UsuarioToken = { sub: string; municipioId: string; papel: Papel };
+// Dados guardados dentro do token (nada sensível: o token é só assinado, não criptografado).
+// `versao` é a versão de sessão do usuário quando o token foi emitido.
+export type UsuarioToken = { sub: string; municipioId: string; papel: Papel; versao: number };
 
 declare module '@fastify/jwt' {
   interface FastifyJWT {
@@ -26,6 +28,17 @@ export function sessaoExpirada() {
   return new AppError(401, 'NAO_AUTENTICADO', 'Sua sessão expirou. Faça login novamente.');
 }
 
+type DadosDoToken = { id: string; municipioId: string; papel: Papel; versaoSessao: number };
+
+export function emitirToken(app: FastifyInstance, usuario: DadosDoToken) {
+  return app.jwt.sign({
+    sub: usuario.id,
+    municipioId: usuario.municipioId,
+    papel: usuario.papel,
+    versao: usuario.versaoSessao,
+  });
+}
+
 export async function registrarAutenticacao(app: FastifyInstance) {
   await app.register(jwt, {
     secret: env.JWT_SECRET,
@@ -41,5 +54,13 @@ export async function registrarAutenticacao(app: FastifyInstance) {
       // Sem token, token adulterado ou expirado: mesma resposta
       throw sessaoExpirada();
     }
+
+    // Token com assinatura válida, mas de um usuário removido ou emitido antes da
+    // última troca de senha (a versão de sessão subiu): não vale mais
+    const usuario = await prisma.usuario.findUnique({
+      where: { id: request.user.sub },
+      select: { versaoSessao: true },
+    });
+    if (!usuario || usuario.versaoSessao !== request.user.versao) throw sessaoExpirada();
   });
 }

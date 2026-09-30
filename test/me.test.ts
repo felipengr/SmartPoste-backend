@@ -99,6 +99,7 @@ describe('GET /v1/me', () => {
       sub: '00000000-0000-7000-8000-000000000000',
       municipioId: 'piracaia',
       papel: 'cidadao',
+      versao: 0,
     });
     const res = await app.inject({
       method: 'GET',
@@ -148,13 +149,32 @@ describe('PATCH /v1/me/senha', () => {
     expect(res.statusCode).toBe(401);
   });
 
-  it('troca a senha: 204, a antiga para de funcionar e a nova passa a funcionar', async () => {
+  it('troca a senha: 200 com token novo, a senha antiga para de funcionar e a nova funciona', async () => {
     const tokenAtual = await token();
     const res = await trocarSenha({ senhaAtual: SENHA, novaSenha: 'nova-senha-123' }, tokenAtual);
 
-    expect(res.statusCode).toBe(204);
-    expect(res.body).toBe('');
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ token: expect.any(String) });
     expect((await login(SENHA)).statusCode).toBe(401);
     expect((await login('nova-senha-123')).statusCode).toBe(200);
+  });
+
+  it('troca a senha: derruba as outras sessões e mantém a deste aparelho', async () => {
+    // Senha deixada pelo teste anterior (o usuário do teste é recriado a cada execução)
+    const senhaAntes = 'nova-senha-123';
+    const outroAparelho = (await login(senhaAntes)).json().token as string;
+    const esteAparelho = (await login(senhaAntes)).json().token as string;
+
+    const res = await trocarSenha(
+      { senhaAtual: senhaAntes, novaSenha: 'outra-senha-456' },
+      esteAparelho,
+    );
+    const tokenNovo = res.json().token as string;
+
+    const me = (t: string) =>
+      app.inject({ method: 'GET', url: '/v1/me', headers: { authorization: `Bearer ${t}` } });
+    expect((await me(outroAparelho)).statusCode).toBe(401);
+    expect((await me(esteAparelho)).statusCode).toBe(401);
+    expect((await me(tokenNovo)).statusCode).toBe(200);
   });
 });

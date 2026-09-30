@@ -6,7 +6,7 @@ import { env } from './env.js';
 import { registrarAutenticacao } from './lib/auth.js';
 import { registrarTratamentoDeErros } from './lib/errors.js';
 import { type EnviarFoto, enviarFotoCloudinary, TAMANHO_MAXIMO_FOTO } from './lib/fotos.js';
-import { authRoutes } from './routes/auth.js';
+import { authRoutes, type LimitesLogin } from './routes/auth.js';
 import { denunciasRoutes } from './routes/denuncias.js';
 import { meRoutes } from './routes/me.js';
 import { municipiosRoutes } from './routes/municipios.js';
@@ -21,10 +21,21 @@ declare module 'fastify' {
 type Opcoes = {
   // Os testes trocam pelo falso, para não enviar fotos ao Cloudinary de verdade
   enviarFoto?: EnviarFoto;
+  limitesLogin?: LimitesLogin;
 };
 
+// Nos testes, cada arquivo faz dezenas de logins seguidos do mesmo IP; o teste do
+// limite passa os próprios números
+const LIMITES_LOGIN: LimitesLogin =
+  env.NODE_ENV === 'test'
+    ? { porConta: Number.POSITIVE_INFINITY, porIp: Number.POSITIVE_INFINITY }
+    : { porConta: 5, porIp: 20 };
+
 // Monta a aplicação sem subir o servidor, para os testes usarem `app.inject()`
-export async function buildApp({ enviarFoto = enviarFotoCloudinary }: Opcoes = {}) {
+export async function buildApp({
+  enviarFoto = enviarFotoCloudinary,
+  limitesLogin = LIMITES_LOGIN,
+}: Opcoes = {}) {
   const app = Fastify({
     logger: env.NODE_ENV === 'test' ? false : { level: 'info' },
   });
@@ -46,7 +57,7 @@ export async function buildApp({ enviarFoto = enviarFotoCloudinary }: Opcoes = {
   app.get('/health', async () => ({ status: 'ok' }));
 
   await app.register(municipiosRoutes, { prefix: '/v1' });
-  await app.register(authRoutes, { prefix: '/v1' });
+  await app.register(authRoutes, { prefix: '/v1', limites: limitesLogin });
   await app.register(meRoutes, { prefix: '/v1' });
   await app.register(usuariosRoutes, { prefix: '/v1' });
   await app.register(denunciasRoutes, { prefix: '/v1' });
