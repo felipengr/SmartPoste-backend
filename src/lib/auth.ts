@@ -21,6 +21,11 @@ declare module 'fastify' {
   }
 }
 
+// Também usado quando o token é válido mas o usuário não existe mais
+export function sessaoExpirada() {
+  return new AppError(401, 'NAO_AUTENTICADO', 'Sua sessão expirou. Faça login novamente.');
+}
+
 export async function registrarAutenticacao(app: FastifyInstance) {
   await app.register(jwt, {
     secret: env.JWT_SECRET,
@@ -34,7 +39,7 @@ export async function registrarAutenticacao(app: FastifyInstance) {
       await request.jwtVerify();
     } catch {
       // Sem token, token adulterado ou expirado: mesma resposta
-      throw new AppError(401, 'NAO_AUTENTICADO', 'Sua sessão expirou. Faça login novamente.');
+      throw sessaoExpirada();
     }
   });
 }
