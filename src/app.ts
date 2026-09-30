@@ -7,6 +7,7 @@ import { registrarTratamentoDeErros } from './lib/errors.js';
 import { authRoutes } from './routes/auth.js';
 import { meRoutes } from './routes/me.js';
 import { municipiosRoutes } from './routes/municipios.js';
+import { usuariosRoutes } from './routes/usuarios.js';
 
 // Monta a aplicação sem subir o servidor, para os testes usarem `app.inject()`
 export async function buildApp() {
@@ -25,6 +26,7 @@ export async function buildApp() {
   await app.register(municipiosRoutes, { prefix: '/v1' });
   await app.register(authRoutes, { prefix: '/v1' });
   await app.register(meRoutes, { prefix: '/v1' });
+  await app.register(usuariosRoutes, { prefix: '/v1' });
 
   return app;
 }
