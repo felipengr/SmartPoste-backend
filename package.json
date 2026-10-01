@@ -15,6 +15,7 @@
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",
     "db:seed:producao": "tsx --env-file=.env.producao prisma/seed-producao.ts",
+    "usuario:cadastrar": "tsx scripts/cadastrar-usuario.ts",
     "db:migrate:producao": "node --env-file=.env.producao node_modules/prisma/build/index.js migrate deploy",
     "db:reset": "prisma migrate reset --force && prisma db seed",
     "db:studio": "prisma studio",
