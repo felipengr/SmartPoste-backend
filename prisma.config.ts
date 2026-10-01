@@ -9,6 +9,9 @@ export default defineConfig({
     seed: 'tsx prisma/seed.ts',
   },
   datasource: {
-    url: env('DATABASE_URL'),
+    // A CLI (migrate) usa esta URL. Em produção (Neon), a API usa a URL com pool
+    // (DATABASE_URL) e as migrations precisam da conexão direta (DIRECT_URL).
+    // Localmente só existe DATABASE_URL, que serve para os dois.
+    url: process.env.DIRECT_URL || env('DATABASE_URL'),
   },
 });

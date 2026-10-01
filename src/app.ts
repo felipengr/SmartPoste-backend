@@ -38,6 +38,8 @@ export async function buildApp({
 }: Opcoes = {}) {
   const app = Fastify({
     logger: env.NODE_ENV === 'test' ? false : { level: 'info' },
+    // Atrás do proxy do Render, request.ip passa a ser o IP de quem chamou (limite de login)
+    trustProxy: env.TRUST_PROXY || false,
   });
 
   // O app nativo não precisa de CORS; isto libera o app rodando no navegador (Expo web)
