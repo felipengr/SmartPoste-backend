@@ -5,8 +5,8 @@
 // POST /v1/usuarios: o usuário nasce no município do gestor, com as mesmas validações do app.
 //
 // Por padrão usa a API de produção; para outra, defina API_URL (ex.: http://localhost:3333/v1).
-// Para automação, os dados também podem vir de variáveis: GESTOR_CPF, GESTOR_SENHA,
-// NOVO_NOME, NOVO_CPF, NOVO_PAPEL, NOVA_SENHA (o que faltar é perguntado).
+// Para automação, os dados também podem vir de variáveis: GESTOR_MUNICIPIO, GESTOR_CPF,
+// GESTOR_SENHA, NOVO_NOME, NOVO_CPF, NOVO_PAPEL, NOVA_SENHA (o que faltar é perguntado).
 import { randomInt } from 'node:crypto';
 import { stdin, stdout } from 'node:process';
 import { createInterface } from 'node:readline/promises';
@@ -123,13 +123,16 @@ async function main() {
   };
 
   try {
+    // O novo usuário nasce no município do gestor que fez login
+    const municipioId =
+      process.env.GESTOR_MUNICIPIO ?? (await perguntar('Seu município (id)', 'piracaia'));
     const gestorCpf = process.env.GESTOR_CPF ?? (await perguntar('Seu CPF de gestor'));
 
     console.log('\nEntrando… (se a API estiver dormindo, pode levar até 1 minuto)');
     const { token, usuario: gestor } = await chamar<{
       token: string;
       usuario: { nome: string; municipio: { nome: string } };
-    }>('/auth/login', { municipioId: 'piracaia', cpf: gestorCpf, senha: gestorSenha });
+    }>('/auth/login', { municipioId, cpf: gestorCpf, senha: gestorSenha });
     console.log(`Olá, ${gestor.nome} (${gestor.municipio.nome}).\n`);
 
     console.log('Novo usuário:');
