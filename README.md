@@ -52,6 +52,7 @@ A API escuta em `0.0.0.0`, então o celular na mesma rede Wi-Fi acessa pelo IP d
 | `npm run release` | Sobe a versão e atualiza o `CHANGELOG.md` |
 | `npm run db:migrate:producao` | Aplica as migrations no banco de produção (lê `.env.producao`) |
 | `npm run db:seed:producao` | Cria Piracaia e o primeiro gestor em produção (lê `.env.producao`) |
+| `npm run usuario:cadastrar` | Cadastra um morador ou gestor pela API de produção (pede o seu login de gestor; senha digitada escondida) |
 
 ## Produção
 
