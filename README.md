@@ -50,6 +50,27 @@ A API escuta em `0.0.0.0`, então o celular na mesma rede Wi-Fi acessa pelo IP d
 | `npm run db:reset` | Apaga o banco local, recria e roda o seed |
 | `npm run db:studio` | Interface visual do banco |
 | `npm run release` | Sobe a versão e atualiza o `CHANGELOG.md` |
+| `npm run db:migrate:producao` | Aplica as migrations no banco de produção (lê `.env.producao`) |
+| `npm run db:seed:producao` | Cria Piracaia e o primeiro gestor em produção (lê `.env.producao`) |
+
+## Produção
+
+API no **Render** e banco no **Neon** (ambos na região US East / Virginia, lado a lado).
+
+**Variáveis no painel do Render** (nunca no git nem no app):
+
+| Variável | Valor |
+|---|---|
+| `NODE_ENV` | `production` |
+| `DATABASE_URL` | URL do Neon **com** pool (`...-pooler...`) |
+| `DIRECT_URL` | URL do Neon **sem** pool (usada pelas migrations no build) |
+| `JWT_SECRET` | novo, diferente do de desenvolvimento |
+| `CLOUDINARY_*` | chave própria de produção |
+| `TRUST_PROXY` | IP/CIDR do proxy do Render (veja o IP de origem no log do primeiro deploy) |
+
+**Build:** `npm ci --include=dev && npm run build && npx prisma migrate deploy` · **Start:** `npm start` · **Health check:** `/health`
+
+**Primeira vez:** crie um `.env.producao` local (fora do git) com `DIRECT_URL`, `GESTOR_CPF`, `GESTOR_NOME` e `GESTOR_SENHA` (12+ caracteres) e rode `npm run db:migrate:producao` e `npm run db:seed:producao`. Depois, apague o arquivo.
 
 ## Estrutura
 

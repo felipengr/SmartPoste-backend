@@ -6,6 +6,10 @@ const schema = z.object({
   DATABASE_URL: z.url(),
   HOST: z.string().default('0.0.0.0'),
   PORT: z.coerce.number().int().positive().default(3333),
+  // IP/CIDR do proxy confiável para dizer o IP real (X-Forwarded-For), ex.: "10.0.0.0/8".
+  // Vazio = ninguém (local). Confiar em qualquer um deixaria inventar o IP e driblar o
+  // limite de tentativas de login (por isso o Fastify nem aceita mais "N saltos").
+  TRUST_PROXY: z.string().trim().default(''),
   // Recusa o valor de exemplo do .env.example: com ele, qualquer um forjaria tokens
   JWT_SECRET: z
     .string()
